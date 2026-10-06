@@ -25,13 +25,13 @@ pipeline {
         }
 
         stage('Health Check') {
-            steps {
-                sh '''
-                    sleep 5
-                    curl -f http://localhost:5001/health
-                '''
-            }
-        }
+    steps {
+        sh '''
+            sleep 5
+            docker exec cicd-test python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:5000/health').read().decode())"
+        '''
+    }
+}
 
     }
 
