@@ -38,6 +38,20 @@ pipeline {
             }
         }
 
+        stage('Save Current Production') {
+            steps {
+                sh '''
+                    if docker inspect cicd-production >/dev/null 2>&1; then
+                        docker inspect cicd-production \
+                        --format='{{.Config.Image}}' > previous-production-image.txt
+                    else
+                        echo "No previous production deployment found."
+                        echo "NONE" > previous-production-image.txt
+                    fi
+                '''
+            }
+        }
+
         stage('Deploy to Production') {
             steps {
                 sh '''
@@ -65,11 +79,31 @@ pipeline {
     post {
         failure {
             sh '''
-                echo "Deployment failed - starting rollback..."
+                echo "Production deployment failed."
+                echo "Starting automatic rollback..."
 
                 docker rm -f cicd-production || true
 
-                echo "Rollback completed."
+                if [ -f previous-production-image.txt ]; then
+                    PREVIOUS_IMAGE=$(cat previous-production-image.txt)
+
+                    if [ "$PREVIOUS_IMAGE" != "NONE" ]; then
+                        echo "Restoring previous image: $PREVIOUS_IMAGE"
+
+                        docker run -d \
+                            --name cicd-production \
+                            -p 5002:5000 \
+                            "$PREVIOUS_IMAGE"
+
+                        sleep 5
+
+                        docker exec cicd-production python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:5000/health').read().decode())"
+
+                        echo "Rollback successful."
+                    else
+                        echo "No previous production version available."
+                    fi
+                fi
             '''
         }
 
