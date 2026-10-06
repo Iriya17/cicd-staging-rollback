@@ -11,33 +11,39 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t cicd-app:${BUILD_NUMBER} ./app'
+                sh 'docker build -t cicd-app:${BUILD_NUMBER} .'
             }
         }
 
-        stage('Run Container') {
+        stage('Deploy to Staging') {
             steps {
                 sh '''
-                    docker rm -f cicd-test || true
-                    docker run -d --name cicd-test -p 5001:5000 cicd-app:${BUILD_NUMBER}
+                    docker rm -f cicd-staging || true
+
+                    docker run -d \
+                        --name cicd-staging \
+                        -p 5001:5000 \
+                        cicd-app:${BUILD_NUMBER}
                 '''
             }
         }
 
-        stage('Health Check') {
-    steps {
-        sh '''
-            sleep 5
-            docker exec cicd-test python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:5000/health').read().decode())"
-        '''
-    }
-}
+        stage('Staging Health Check') {
+            steps {
+                sh '''
+                    sleep 5
 
+                    docker exec cicd-staging python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:5000/health').read().decode())"
+                '''
+            }
+        }
     }
 
     post {
         always {
-            sh 'docker rm -f cicd-test || true'
+            sh '''
+                docker rm -f cicd-staging || true
+            '''
         }
     }
 }
