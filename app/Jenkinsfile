@@ -10,10 +10,10 @@ pipeline {
         }
 
         stage('Build Docker Image') {
-            steps {
-                sh 'docker build -t cicd-app:${BUILD_NUMBER} .'
-            }
-        }
+    steps {
+        sh 'docker build -t cicd-app:${BUILD_NUMBER} ./app'
+    }
+}
 
         stage('Deploy to Staging') {
             steps {
