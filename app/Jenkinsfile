@@ -10,10 +10,10 @@ pipeline {
         }
 
         stage('Build Docker Image') {
-    steps {
-        sh 'docker build -t cicd-app:${BUILD_NUMBER} ./app'
-    }
-}
+            steps {
+                sh 'docker build -t cicd-app:${BUILD_NUMBER} ./app'
+            }
+        }
 
         stage('Deploy to Staging') {
             steps {
@@ -37,9 +37,42 @@ pipeline {
                 '''
             }
         }
+
+        stage('Deploy to Production') {
+            steps {
+                sh '''
+                    docker rm -f cicd-production || true
+
+                    docker run -d \
+                        --name cicd-production \
+                        -p 5002:5000 \
+                        cicd-app:${BUILD_NUMBER}
+                '''
+            }
+        }
+
+        stage('Production Health Check') {
+            steps {
+                sh '''
+                    sleep 5
+
+                    docker exec cicd-production python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:5000/health').read().decode())"
+                '''
+            }
+        }
     }
 
     post {
+        failure {
+            sh '''
+                echo "Deployment failed - starting rollback..."
+
+                docker rm -f cicd-production || true
+
+                echo "Rollback completed."
+            '''
+        }
+
         always {
             sh '''
                 docker rm -f cicd-staging || true
