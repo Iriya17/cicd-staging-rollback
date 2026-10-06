@@ -1,0 +1,43 @@
+pipeline {
+    agent any
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t cicd-app:${BUILD_NUMBER} ./app'
+            }
+        }
+
+        stage('Run Container') {
+            steps {
+                sh '''
+                    docker rm -f cicd-test || true
+                    docker run -d --name cicd-test -p 5001:5000 cicd-app:${BUILD_NUMBER}
+                '''
+            }
+        }
+
+        stage('Health Check') {
+            steps {
+                sh '''
+                    sleep 5
+                    curl -f http://localhost:5001/health
+                '''
+            }
+        }
+
+    }
+
+    post {
+        always {
+            sh 'docker rm -f cicd-test || true'
+        }
+    }
+}
